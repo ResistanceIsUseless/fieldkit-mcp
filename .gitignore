@@ -1,0 +1,40 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment & secrets
+.env
+.envrc
+*.key
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Local config (machine-specific paths)
+claude_desktop_config.json
+
+# Temp
+./tmp/
+tmp/
+
+# Logs & output
+*.log
+reports/
