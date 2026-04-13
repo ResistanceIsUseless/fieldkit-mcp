@@ -1,6 +1,6 @@
-# recon_mcp — Offensive Security Reconnaissance MCP Server
+# fieldkit-mcp — Offensive Security Reconnaissance MCP Server
 
-A comprehensive MCP server exposing multi-engine search dorking (Google, DuckDuckGo), Shodan integration, and five recon CLI tools for LLM-driven security assessments.
+A comprehensive MCP server exposing multi-engine search dorking, Shodan, GitHub OSINT, secret scanning, and ten recon CLI tools for LLM-driven security assessments.
 
 **AUTHORIZATION NOTICE:** This server is designed for authorized security testing only. All reconnaissance activities are performed against systems where explicit written authorization has been obtained.
 
@@ -8,20 +8,32 @@ A comprehensive MCP server exposing multi-engine search dorking (Google, DuckDuc
 
 | MCP Tool | Wraps | Type | Description |
 |---|---|---|---|
-| `recon_google_dork` | DuckDuckGo, Google | Passive | Executes search dork queries (DDG default, supports both engines) |
-| `recon_github_search` | GitHub API | Passive | Quick search GitHub for exposed secrets, credentials, API keys |
-| `recon_trufflehog` | `trufflehog` | Passive | Deep secret scanning with 200+ detectors, entropy analysis, verification |
-| `recon_wayback` | Wayback Machine | Passive | Historical snapshots from Archive.org |
-| `recon_shodan_host` | Shodan API | Passive | Lookup host information on Shodan |
-| `recon_shodan_search` | Shodan API | Passive | Search Shodan for hosts matching criteria |
-| `recon_shodan_dns` | Shodan API | Passive | DNS resolution via Shodan |
-| `recon_subfinder` | `subfinder` | Passive | Subdomain enumeration via passive sources |
-| `recon_nuclei` | `nuclei` | **Active** | Vulnerability scanning with templates |
-| `recon_dnsx` | `dnsx` | Passive | DNS resolution & enumeration (supports wordlists) |
-| `recon_httpx` | `httpx` | Passive | HTTP probing, tech detection, title extraction |
-| `recon_katana` | `katana` | **Active** | Web crawling / endpoint discovery |
-| `recon_theharvester` | `theHarvester` | Passive | Email, subdomain & IP OSINT |
-| `recon_status` | — | Local | Checks which binaries, integrations, and API keys are available |
+| `dork_search` | DuckDuckGo, Google | Passive | Executes search dork queries (DDG default, supports both engines) |
+| `search_github_secrets` | GitHub API | Passive | Search GitHub for exposed secrets, credentials, and API keys |
+| `hunt_secrets` | `trufflehog` | Passive | Deep secret scanning with 700+ detectors, entropy analysis, verification |
+| `query_wayback` | Wayback Machine | Passive | Historical URL snapshots from Archive.org |
+| `lookup_shodan_host` | Shodan API | Passive | Lookup host information on Shodan |
+| `search_shodan` | Shodan API | Passive | Search Shodan for hosts matching criteria |
+| `resolve_shodan_dns` | Shodan API | Passive | DNS resolution via Shodan |
+| `discover_subdomains` | `subfinder` | Passive | Subdomain enumeration via passive sources |
+| `recon_subscope` | `subscope` | Passive/Active | Advanced subdomain enumeration pipeline (subfinder + httpx + shuffledns + alterx) |
+| `scan_vulnerabilities` | `nuclei` | **Active** | Vulnerability scanning with templates |
+| `enumerate_dns` | `dnsx` | Passive | DNS resolution & enumeration (supports wordlists) |
+| `probe_http` | `httpx` | Passive | HTTP probing, tech detection, title extraction |
+| `web_search` | DuckDuckGo HTML | Passive | Web search returning ranked URLs and snippets |
+| `web_fetch` | Python `httpx` | Passive | Raw HTTP fetch with method/header/body control, ignores robots.txt |
+| `web_render` | Playwright Chromium | **Active** | Render JavaScript-heavy pages with optional action sequences |
+| `web_crawl` | `katana` | **Active** | Web crawling / endpoint discovery |
+| `web_screenshot` | Playwright Chromium | **Active** | Capture rendered page screenshots to PNG |
+| `web_extract` | selectolax + readability-lxml | Passive | Extract readable content, CSS, or XPath selections |
+| `fingerprint_tech` | Wappalyzer + heuristics | Passive | Detect web technologies from headers and rendered content |
+| `query_cache` | sqlite | Local | List and retrieve cached web responses |
+| `recon_webscope` | `webscope` | **Active** | Web content discovery, JS analysis, secret detection, path bruteforcing |
+| `recon_nmap` | `nmap` | **Active** | Network & port scanning with service/OS/vuln detection |
+| `harvest_osint` | `theHarvester` | Passive | Email, subdomain & IP OSINT |
+| `check_tool_status` | — | Local | Checks which binaries, integrations, and API keys are available |
+
+Legacy `recon_*` names are still available as deprecated aliases for compatibility.
 
 ## Prerequisites
 
@@ -45,6 +57,21 @@ go install -v github.com/projectdiscovery/katana/cmd/katana@latest
 **TruffleHog** (Go-based secret scanner):
 ```bash
 go install github.com/trufflesecurity/trufflehog/v3@latest
+```
+
+**Custom recon tools** (Go-based):
+```bash
+go install github.com/ResistanceIsUseless/webscope@latest
+go install github.com/ResistanceIsUseless/subscope@latest
+```
+
+**Nmap** (system package):
+```bash
+# macOS
+brew install nmap
+
+# Debian/Ubuntu
+apt-get install -y nmap
 ```
 
 **theHarvester** (Python-based):
@@ -96,17 +123,34 @@ export CHAOS_API_KEY="..."       # ProjectDiscovery Chaos
 
 ## Running the Server
 
+### One-Command Docker (Recommended)
+
+```bash
+cp .env.example .env
+docker compose up -d
+```
+
+Server endpoint: `http://localhost:8000/mcp`
+
+### Native Install Helper
+
+```bash
+chmod +x install.sh
+./install.sh
+python fieldkit_mcp_server.py
+```
+
 ### Standalone HTTP Mode
 
 ```bash
 # Default port 8000
-python recon_mcp_server.py
+python fieldkit_mcp_server.py
 
 # Custom port
-python recon_mcp_server.py --port 9000
+python fieldkit_mcp_server.py --port 9000
 
 # Or via env var
-RECON_MCP_PORT=9000 python recon_mcp_server.py
+FIELDKIT_MCP_PORT=9000 python fieldkit_mcp_server.py
 ```
 
 ### Managed by Claude Desktop
@@ -122,11 +166,11 @@ Claude Desktop requires a command-based configuration:
 ```json
 {
   "mcpServers": {
-    "recon_mcp": {
+    "fieldkit_mcp": {
       "command": "python",
-      "args": ["/path/to/your/project/recon_mcp_server.py"],
+      "args": ["/path/to/your/project/fieldkit_mcp_server.py"],
       "env": {
-        "RECON_MCP_PORT": "8000"
+        "FIELDKIT_MCP_PORT": "8000"
       }
     }
   }
@@ -142,7 +186,7 @@ If you prefer to run the server as a separate HTTP process, you can use the fetc
 ```json
 {
   "mcpServers": {
-    "recon_mcp": {
+    "fieldkit_mcp": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-fetch", "http://localhost:8000/mcp"]
     }
@@ -157,7 +201,7 @@ Claude Code supports both URL and command formats:
 ```json
 {
   "mcpServers": {
-    "recon_mcp": {
+    "fieldkit_mcp": {
       "url": "http://localhost:8000/mcp"
     }
   }
@@ -169,9 +213,9 @@ Or command-based:
 ```json
 {
   "mcpServers": {
-    "recon_mcp": {
+    "fieldkit_mcp": {
       "command": "python",
-      "args": ["./recon_mcp_server.py"]
+      "args": ["./fieldkit_mcp_server.py"]
     }
   }
 }
@@ -218,6 +262,8 @@ Once connected, the LLM can call tools like:
 **Subdomain Enumeration & Probing:**
 > "Run subfinder against example.com and then resolve the discovered subdomains with dnsx"
 
+> "Run subscope on example.com for full subdomain enumeration with HTTP analysis"
+
 > "Run subfinder on example.com, then pipe results to httpx to find live web servers"
 
 > "Probe https://example.com with httpx and show technologies"
@@ -227,14 +273,39 @@ Once connected, the LLM can call tools like:
 **Vulnerability Scanning:**
 > "Use nuclei to check example.com for critical and high severity vulnerabilities"
 
+**Web Content Discovery:**
+> "Run webscope against https://example.com in in-depth mode to find hidden endpoints and secrets"
+
+> "Use webscope with intense flow on https://example.com and focus on JavaScript analysis"
+
 **Web Crawling:**
 > "Crawl https://example.com with katana depth 3 and look for API endpoints"
 
+**Web Surface:**
+> "Use web_search for exposed staging login pages for example.com"
+
+> "Use web_fetch on https://example.com/.well-known/security.txt with method GET"
+
+> "Use web_render on https://example.com and click the '#login' button"
+
+> "Take a full-page web_screenshot of https://example.com"
+
+> "Use web_extract readability mode on https://example.com/blog/post"
+
+> "Run fingerprint_tech for https://example.com"
+
+> "Use query_cache to list recent cached pages"
+
+**Network Scanning:**
+> "Run a quick nmap scan on example.com to see open ports and services"
+
+> "Use nmap vuln scan on 192.168.1.0/24 to check for vulnerabilities"
+
 **Status Check:**
-> "Check recon_status to see which tools are installed"
+> "Check check_tool_status to see which tools are installed"
 
 ## Security Notice
 
-⚠️ **Authorization Required**: Tools marked **Active** (nuclei, katana) send requests to targets. Only use against systems you have explicit written authorization to test. Unauthorized scanning may violate laws including the CFAA.
+⚠️ **Authorization Required**: Tools marked **Active** (nuclei, katana, webscope, subscope, nmap) send requests to targets. Only use against systems you have explicit written authorization to test. Unauthorized scanning may violate laws including the CFAA.
 
-The Google Dorking tool generates queries only — it does not execute searches to avoid Google ToS violations.
+Some nmap scan types (SYN stealth, OS detection, UDP) require root/sudo privileges.

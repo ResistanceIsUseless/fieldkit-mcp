@@ -1,14 +1,14 @@
-# Recon MCP - Agent Guide
+# FieldKit MCP - Agent Guide
 
-This document provides essential information for agents working with the Recon MCP codebase.
+This document provides essential information for agents working with the FieldKit MCP codebase.
 
 ## Project Overview
 
-Recon MCP is a single-file Python MCP (Model Context Protocol) server that exposes offensive security reconnaissance tools for LLM-driven security assessments. It wraps five popular CLI tools and provides Google Dorking query building capabilities.
+FieldKit MCP is a single-file Python MCP (Model Context Protocol) server that exposes offensive security reconnaissance tools for LLM-driven security assessments. It wraps multiple popular CLI tools and provides Google Dorking query building capabilities.
 
 ### Architecture
 
-- **Single-file design**: All server logic in `recon_mcp_server.py`
+- **Single-file design**: All server logic in `fieldkit_mcp_server.py`
 - **HTTP transport**: Runs as streamable HTTP server (default port 8000)
 - **Tool wrapping**: Exposes recon tools via standardized MCP interface
 - **Mixed safety**: Combines passive OSINT with active scanning tools
@@ -31,13 +31,13 @@ go install -v github.com/projectdiscovery/katana/cmd/katana@latest
 pip install theHarvester
 
 # Run the server (default port 8000)
-python recon_mcp_server.py
+python fieldkit_mcp_server.py
 
 # Run on custom port
-python recon_mcp_server.py --port 9000
+python fieldkit_mcp_server.py --port 9000
 
 # Or via environment variable
-RECON_MCP_PORT=9000 python recon_mcp_server.py
+FIELDKIT_MCP_PORT=9000 python fieldkit_mcp_server.py
 ```
 
 ### Environment Variables (Optional but Recommended)
@@ -57,10 +57,10 @@ export GITHUB_TOKEN="..."
 
 ### File Structure
 ```
-Recon-MCP/
+fieldkit-mcp/
 ├── README.md              # User documentation
 ├── requirements.txt       # Python dependencies  
-├── recon_mcp_server.py    # Complete server implementation
+├── fieldkit_mcp_server.py # Complete server implementation
 └── AGENTS.md             # This file
 ```
 
@@ -227,10 +227,10 @@ All wrapped tools must be installed separately and available on PATH:
 
 ```bash
 # Check environment
-python recon_mcp_server.py --help
+python fieldkit_mcp_server.py --help
 
 # Test server startup
-python recon_mcp_server.py --port 8000 &
+python fieldkit_mcp_server.py --port 8000 &
 
 # Test tool availability
 # (Connect MCP client and call recon_status)
@@ -312,7 +312,7 @@ result = await _run_command(
 
 ### Server Configuration
 
-- **Port**: `RECON_MCP_PORT` environment variable or `--port` argument
+- **Port**: `FIELDKIT_MCP_PORT` environment variable or `--port` argument
 - **Logging**: stderr only (stdout reserved for MCP transport)
 - **Timeouts**: Configurable per tool with sensible defaults
 
@@ -321,7 +321,7 @@ result = await _run_command(
 ```json
 {
   "mcpServers": {
-    "recon_mcp": {
+    "fieldkit_mcp": {
       "url": "http://localhost:8000/mcp"
     }
   }
@@ -354,7 +354,7 @@ Server logs to stderr with format: `YYYY-MM-DD HH:MM:SS [LEVEL] logger: message`
 ```python
 import logging
 logging.basicConfig(level=logging.INFO, stream=sys.stderr)
-logger = logging.getLogger("recon_mcp")
+logger = logging.getLogger("fieldkit_mcp")
 ```
 
 ## Memory Considerations
@@ -364,4 +364,4 @@ logger = logging.getLogger("recon_mcp")
 - DNS brute-forcing can generate significant results - use max_results parameter
 - Nuclei scans can be memory intensive with many concurrent templates
 
-This guide should help agents understand the codebase structure, patterns, and conventions for effective development and maintenance of the Recon MCP server.
+This guide should help agents understand the codebase structure, patterns, and conventions for effective development and maintenance of the FieldKit MCP server.

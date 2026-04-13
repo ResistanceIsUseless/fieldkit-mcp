@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""
-Test script for Recon MCP server - tests tool functions directly
-"""
+"""Test script for FieldKit MCP server functions."""
 
 import asyncio
 import json
@@ -11,7 +9,7 @@ import os
 # Add current directory to path so we can import the server
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from recon_mcp_server import (
+from fieldkit_mcp_server import (
     recon_status,
     recon_google_dork,
     recon_subfinder,
@@ -22,7 +20,7 @@ async def test_recon_status():
     """Test the status function"""
     print("Testing recon_status...")
     try:
-        from recon_mcp_server import StatusInput
+        from fieldkit_mcp_server import StatusInput
         
         result = await recon_status(StatusInput(response_format="json"))
         data = json.loads(result)
@@ -48,7 +46,7 @@ async def test_google_dork():
     """Test Google dork function"""
     print("Testing recon_google_dork...")
     try:
-        from recon_mcp_server import GoogleDorkInput
+        from fieldkit_mcp_server import GoogleDorkInput
         
         # Test with a preset
         params = GoogleDorkInput(
@@ -75,7 +73,7 @@ async def test_subfinder():
     """Test subfinder function"""
     print("Testing recon_subfinder...")
     try:
-        from recon_mcp_server import SubfinderInput
+        from fieldkit_mcp_server import SubfinderInput
         
         params = SubfinderInput(
             domain="example.com",
@@ -108,7 +106,7 @@ async def test_dnsx():
     """Test dnsx function"""
     print("Testing recon_dnsx...")
     try:
-        from recon_mcp_server import DnsxInput
+        from fieldkit_mcp_server import DnsxInput
         
         params = DnsxInput(
             domain="example.com",
@@ -137,7 +135,7 @@ async def test_dnsx():
 
 async def main():
     """Run all tests"""
-    print("🚀 Testing Recon MCP server functions...")
+    print("🚀 Testing FieldKit MCP server functions...")
     print("=" * 50)
     
     tests = [

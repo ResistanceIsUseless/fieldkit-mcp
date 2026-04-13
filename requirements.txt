@@ -5,3 +5,7 @@ googlesearch-python>=1.2.3
 duckduckgo-search>=6.0.0
 shodan>=1.31.0
 beautifulsoup4>=4.12.0
+playwright>=1.47
+selectolax>=0.3.21
+readability-lxml>=0.8.1
+python-Wappalyzer>=0.4.0

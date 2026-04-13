@@ -1,0 +1,11 @@
+services:
+  fieldkit-mcp:
+    build: .
+    container_name: fieldkit-mcp
+    ports:
+      - "8000:8000"
+    env_file: .env
+    volumes:
+      - ./cache:/app/cache
+      - ./output:/app/output
+    restart: unless-stopped
