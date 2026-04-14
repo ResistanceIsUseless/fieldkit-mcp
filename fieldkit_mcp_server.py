@@ -4,7 +4,8 @@ fieldkit-mcp - Offensive Security Reconnaissance MCP Server
 
 A Model Context Protocol server exposing search engine dorking, Shodan, and
 ProjectDiscovery tools (subfinder, nuclei, dnsx, katana, httpx) plus theHarvester,
-webscope, subscope, nmap, and trufflehog for LLM-driven reconnaissance workflows.
+webscope, subscope, nmap, trufflehog, and ipintel for LLM-driven reconnaissance
+workflows.
 
 AUTHORIZATION NOTICE:
 This server is designed for authorized security testing only. All reconnaissance
@@ -26,6 +27,7 @@ Required tools (must be on PATH):
   - subscope    (github.com/ResistanceIsUseless/subscope)
   - nmap        (nmap.org)
   - trufflehog  (github.com/trufflesecurity/trufflehog)
+  - ipintel     (github.com/ResistanceIsUseless/ipintel)
 
 Environment variables (optional, enhance results):
   - SHODAN_API_KEY (required for Shodan tools)
@@ -58,6 +60,7 @@ from web_tools import register_web_tools
 # Search engines and Shodan
 try:
     from googlesearch import search as google_search
+
     GOOGLE_SEARCH_AVAILABLE = True
 except ImportError:
     GOOGLE_SEARCH_AVAILABLE = False
@@ -65,6 +68,7 @@ except ImportError:
 
 try:
     from duckduckgo_search import DDGS
+
     DUCKDUCKGO_AVAILABLE = True
 except ImportError:
     DUCKDUCKGO_AVAILABLE = False
@@ -72,6 +76,7 @@ except ImportError:
 
 try:
     import shodan
+
     SHODAN_AVAILABLE = True
 except ImportError:
     SHODAN_AVAILABLE = False
@@ -93,7 +98,9 @@ logger = logging.getLogger("fieldkit_mcp")
 DEFAULT_TIMEOUT = 300  # seconds — nuclei scans can be slow
 MAX_OUTPUT_LINES = 200  # cap output to keep context manageable for LLMs
 MAX_OUTPUT_CHARS = 12000  # hard cap on character count (~3k tokens)
-SERVER_PORT = int(os.environ.get("FIELDKIT_MCP_PORT", os.environ.get("RECON_MCP_PORT", "8000")))
+SERVER_PORT = int(
+    os.environ.get("FIELDKIT_MCP_PORT", os.environ.get("RECON_MCP_PORT", "8000"))
+)
 
 # Wordlist paths - can be overridden via environment variables
 WORDLIST_DIR = os.environ.get("WORDLIST_DIR", os.path.expanduser("~/.recon-wordlists"))
@@ -108,12 +115,30 @@ COMMON_WORDLISTS = {
     "dns_bitquark": "Discovery/DNS/bitquark-subdomains-top100000.txt",
 }
 
+# Port presets for fast, repeatable scan profiles
+ALL_INTERESTING_SERVICES_PORTS = (
+    "22,80,139,389,443,445,623,631,636,999,1080,1880,1098,1099,2379,2443,"
+    "3128,3389-3398,3443,3632,4001,4443,4848,5001,5002,5443,5800,5836,"
+    "5900-5910,5985,5986,6002,6379,6782-6784,6739,6443,7001,7002,7071,7443,"
+    "8000-8010,8080,8081,8118,8443,8444,8500,8888,9001,9060,9090,9093,9099,"
+    "9100,9443,9901,9999,10000,10250,10255,10256,11211,38801,53281"
+)
+
+HTTP_SERVICES_PORTS = (
+    "80,443,999,1080,1880,1098,1099,2379,2443,3128,3443,3632,4001,4443,"
+    "4848,5001,5002,5443,5800,5836,5985,5986,6002,6379,6782-6784,6739,6443,"
+    "7001,7002,7071,7443,8000-8010,8080,8081,8118,8443,8444,8500,8888,9001,"
+    "9060,9090,9093,9099,9100,9443,9901,9999,10000,10250,10255,10256,38801,53281"
+)
+
 # ---------------------------------------------------------------------------
 # Server Init
 # ---------------------------------------------------------------------------
 # Check if we should use stdio mode (for Claude Desktop) or HTTP mode
 USE_STDIO = os.environ.get("MCP_TRANSPORT", "").lower() == "stdio"
-mcp = FastMCP("fieldkit-mcp") if USE_STDIO else FastMCP("fieldkit-mcp", port=SERVER_PORT)
+mcp = (
+    FastMCP("fieldkit-mcp") if USE_STDIO else FastMCP("fieldkit-mcp", port=SERVER_PORT)
+)
 init_cache()
 register_web_tools(mcp)
 
@@ -121,8 +146,10 @@ register_web_tools(mcp)
 # Shared Models
 # ---------------------------------------------------------------------------
 
+
 class ResponseFormat(str, Enum):
     """Output format for tool responses."""
+
     MARKDOWN = "markdown"
     JSON = "json"
 
@@ -130,6 +157,7 @@ class ResponseFormat(str, Enum):
 # ---------------------------------------------------------------------------
 # Shared Helpers
 # ---------------------------------------------------------------------------
+
 
 def _get_wordlist_path(wordlist_name: str) -> Optional[str]:
     """
@@ -153,7 +181,9 @@ def _get_wordlist_path(wordlist_name: str) -> Optional[str]:
             return wordlist_path
         else:
             logger.warning(f"Wordlist '{wordlist_name}' not found at {wordlist_path}")
-            logger.info(f"To install SecLists: git clone https://github.com/danielmiessler/SecLists.git {SECLISTS_DIR}")
+            logger.info(
+                f"To install SecLists: git clone https://github.com/danielmiessler/SecLists.git {SECLISTS_DIR}"
+            )
             return None
 
     # Check if it's a path relative to WORDLIST_DIR
@@ -355,8 +385,10 @@ def _format_result(
 # TOOL 1 — Search Engine Dorking (Google, DuckDuckGo, both)
 # =========================================================================
 
+
 class GoogleDorkInput(BaseModel):
     """Input for constructing and executing search engine dork queries."""
+
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     # Core target
@@ -458,7 +490,7 @@ _DORK_PRESETS: Dict[str, List[str]] = {
         'filetype:env "DB_PASSWORD"',
         'filetype:sql "insert into"',
         'filetype:log "password"',
-        'filetype:bak inurl:admin',
+        "filetype:bak inurl:admin",
         'filetype:cfg "password"',
     ],
     "login_pages": [
@@ -486,7 +518,7 @@ _DORK_PRESETS: Dict[str, List[str]] = {
     ],
     "config_files": [
         'filetype:xml "password"',
-        'filetype:conf inurl:etc',
+        "filetype:conf inurl:etc",
         'filetype:ini "[database]"',
         'filetype:yaml "api_key"',
     ],
@@ -497,9 +529,9 @@ _DORK_PRESETS: Dict[str, List[str]] = {
         'inurl:"/openapi.json"',
     ],
     "cloud_exposure": [
-        'site:s3.amazonaws.com',
-        'site:blob.core.windows.net',
-        'site:storage.googleapis.com',
+        "site:s3.amazonaws.com",
+        "site:blob.core.windows.net",
+        "site:storage.googleapis.com",
         'inurl:".s3.amazonaws.com" "index of"',
     ],
 }
@@ -594,13 +626,19 @@ async def dork_search(params: GoogleDorkInput) -> str:
                     ddg_results = []
                     with DDGS() as ddgs:
                         for result in ddgs.text(query, max_results=params.max_results):
-                            ddg_results.append({
-                                "url": result.get("href", result.get("link", "")),
-                                "title": result.get("title", ""),
-                                "snippet": result.get("body", result.get("snippet", ""))
-                            })
+                            ddg_results.append(
+                                {
+                                    "url": result.get("href", result.get("link", "")),
+                                    "title": result.get("title", ""),
+                                    "snippet": result.get(
+                                        "body", result.get("snippet", "")
+                                    ),
+                                }
+                            )
                     search_results[query]["duckduckgo"] = ddg_results
-                    logger.info(f"DuckDuckGo: Found {len(ddg_results)} results for: {query}")
+                    logger.info(
+                        f"DuckDuckGo: Found {len(ddg_results)} results for: {query}"
+                    )
                 except Exception as e:
                     logger.error(f"DuckDuckGo search failed for '{query}': {e}")
                     search_results[query]["duckduckgo"] = {"error": str(e)}
@@ -609,10 +647,14 @@ async def dork_search(params: GoogleDorkInput) -> str:
             if engine in ("google", "both"):
                 try:
                     google_results = []
-                    for url in google_search(query, num_results=params.max_results, sleep_interval=2):
+                    for url in google_search(
+                        query, num_results=params.max_results, sleep_interval=2
+                    ):
                         google_results.append({"url": url})
                     search_results[query]["google"] = google_results
-                    logger.info(f"Google: Found {len(google_results)} results for: {query}")
+                    logger.info(
+                        f"Google: Found {len(google_results)} results for: {query}"
+                    )
                 except Exception as e:
                     logger.error(f"Google search failed for '{query}': {e}")
                     search_results[query]["google"] = {"error": str(e)}
@@ -627,12 +669,18 @@ async def dork_search(params: GoogleDorkInput) -> str:
         }
         if params.execute_search:
             output["results"] = search_results
-            output["warning"] = "Automated Google searches may violate Google ToS if overused"
+            output["warning"] = (
+                "Automated Google searches may violate Google ToS if overused"
+            )
         else:
-            output["usage_note"] = "Execute these queries in a browser. Set execute_search=True to run automatically."
+            output["usage_note"] = (
+                "Execute these queries in a browser. Set execute_search=True to run automatically."
+            )
         return json.dumps(output, indent=2)
 
-    lines = [f"## Search Dork Queries ({params.search_engine.upper() if params.execute_search else 'N/A'})\n"]
+    lines = [
+        f"## Search Dork Queries ({params.search_engine.upper() if params.execute_search else 'N/A'})\n"
+    ]
     if params.domain:
         lines.append(f"**Target domain:** `{params.domain}`\n")
     if params.preset:
@@ -709,8 +757,10 @@ async def recon_google_dork(params: GoogleDorkInput) -> str:
 # TOOL 2 — subfinder (subdomain enumeration)
 # =========================================================================
 
+
 class SubfinderInput(BaseModel):
     """Input for ProjectDiscovery subfinder."""
+
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     domain: str = Field(
@@ -799,7 +849,9 @@ async def discover_subdomains(params: SubfinderInput) -> str:
 
     # Post-process: deduplicate and optionally cap results
     if result["stdout"]:
-        subs = sorted(set(line.strip() for line in result["stdout"].splitlines() if line.strip()))
+        subs = sorted(
+            set(line.strip() for line in result["stdout"].splitlines() if line.strip())
+        )
         if params.max_results and len(subs) > params.max_results:
             subs = subs[: params.max_results]
         result["stdout"] = "\n".join(subs)
@@ -829,8 +881,10 @@ async def recon_subfinder(params: SubfinderInput) -> str:
 # TOOL 3 — nuclei (vulnerability scanning)
 # =========================================================================
 
+
 class NucleiSeverity(str, Enum):
     """Nuclei template severity levels."""
+
     INFO = "info"
     LOW = "low"
     MEDIUM = "medium"
@@ -840,6 +894,7 @@ class NucleiSeverity(str, Enum):
 
 class NucleiInput(BaseModel):
     """Input for ProjectDiscovery nuclei."""
+
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     target: str = Field(
@@ -968,8 +1023,10 @@ async def recon_nuclei(params: NucleiInput) -> str:
 # TOOL 4 — dnsx (DNS resolution & enumeration)
 # =========================================================================
 
+
 class DnsRecordType(str, Enum):
     """DNS record types supported by dnsx."""
+
     A = "a"
     AAAA = "aaaa"
     CNAME = "cname"
@@ -984,6 +1041,7 @@ class DnsRecordType(str, Enum):
 
 class DnsxInput(BaseModel):
     """Input for ProjectDiscovery dnsx."""
+
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     domain: Optional[str] = Field(
@@ -1101,8 +1159,10 @@ async def recon_dnsx(params: DnsxInput) -> str:
 # TOOL 5 — katana (web crawler / spider)
 # =========================================================================
 
+
 class KatanaInput(BaseModel):
     """Input for ProjectDiscovery katana."""
+
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     target: str = Field(
@@ -1207,7 +1267,9 @@ async def web_crawl(params: KatanaInput) -> str:
 
     # Post-process: deduplicate URLs
     if result["stdout"]:
-        urls = sorted(set(line.strip() for line in result["stdout"].splitlines() if line.strip()))
+        urls = sorted(
+            set(line.strip() for line in result["stdout"].splitlines() if line.strip())
+        )
         result["stdout"] = "\n".join(urls)
         result["count"] = len(urls)
     else:
@@ -1235,8 +1297,10 @@ async def recon_katana(params: KatanaInput) -> str:
 # TOOL 6 — httpx (HTTP probing & technology detection)
 # =========================================================================
 
+
 class HttpxInput(BaseModel):
     """Input for ProjectDiscovery httpx."""
+
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     url: Optional[str] = Field(
@@ -1282,6 +1346,14 @@ class HttpxInput(BaseModel):
         default=None,
         description="Exclude specific status codes (e.g., '404,403')",
         max_length=100,
+    )
+    ports: Optional[str] = Field(
+        default=None,
+        description=(
+            "Ports to probe (e.g., '80,443,8080' or '1-1024'). "
+            "Special presets: 'all_interesting_services', 'http_services'."
+        ),
+        max_length=1000,
     )
     threads: int = Field(
         default=50,
@@ -1353,12 +1425,25 @@ async def probe_http(params: HttpxInput) -> str:
     if params.filter_code:
         cmd.extend(["-filter-code", params.filter_code])
 
+    if params.ports:
+        selected_ports = params.ports.strip()
+        preset = selected_ports.lower()
+        if preset == "all_interesting_services":
+            selected_ports = ALL_INTERESTING_SERVICES_PORTS
+        elif preset == "http_services":
+            selected_ports = HTTP_SERVICES_PORTS
+        cmd.extend(["-ports", selected_ports])
+
     cmd.extend(["-threads", str(params.threads)])
     cmd.extend(["-timeout", str(params.timeout)])
 
     # Single URL mode
     if params.url:
-        url = params.url if params.url.startswith(("http://", "https://")) else f"http://{params.url}"
+        url = (
+            params.url
+            if params.url.startswith(("http://", "https://"))
+            else f"http://{params.url}"
+        )
         cmd.extend(["-u", url])
 
     result = await _run_command(
@@ -1378,11 +1463,10 @@ async def probe_http(params: HttpxInput) -> str:
                     continue
 
     if params.response_format == ResponseFormat.JSON:
-        return json.dumps({
-            "tool": "probe_http",
-            "total_probed": len(results),
-            "results": results
-        }, indent=2)
+        return json.dumps(
+            {"tool": "probe_http", "total_probed": len(results), "results": results},
+            indent=2,
+        )
 
     # Format as markdown
     lines = ["## httpx — HTTP Probe Results\n"]
@@ -1447,8 +1531,10 @@ async def recon_httpx(params: HttpxInput) -> str:
 # TOOL 7 — theHarvester (email, name, subdomain, IP OSINT)
 # =========================================================================
 
+
 class HarvesterSource(str, Enum):
     """Data sources supported by theHarvester."""
+
     ANUBIS = "anubis"
     BAIDU = "baidu"
     BING = "bing"
@@ -1470,6 +1556,7 @@ class HarvesterSource(str, Enum):
 
 class HarvesterInput(BaseModel):
     """Input for theHarvester."""
+
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     domain: str = Field(
@@ -1563,10 +1650,14 @@ async def harvest_osint(params: HarvesterInput) -> str:
 
     cmd = [
         "theHarvester",
-        "-d", params.domain,
-        "-b", sources,
-        "-l", str(params.limit),
-        "-S", str(params.start),
+        "-d",
+        params.domain,
+        "-b",
+        sources,
+        "-l",
+        str(params.limit),
+        "-S",
+        str(params.start),
     ]
 
     if params.dns_lookup:
@@ -1600,8 +1691,10 @@ async def recon_theharvester(params: HarvesterInput) -> str:
 # TOOL 8 — Shodan Host Lookup
 # =========================================================================
 
+
 class ShodanHostInput(BaseModel):
     """Input for Shodan host lookup."""
+
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     ip: str = Field(
@@ -1658,29 +1751,33 @@ async def lookup_shodan_host(params: ShodanHostInput) -> str:
         lines = [f"## Shodan Host: {params.ip}\n"]
         lines.append(f"**Organization:** {host.get('org', 'N/A')}")
         lines.append(f"**ISP:** {host.get('isp', 'N/A')}")
-        lines.append(f"**Location:** {host.get('city', 'N/A')}, {host.get('country_name', 'N/A')}")
+        lines.append(
+            f"**Location:** {host.get('city', 'N/A')}, {host.get('country_name', 'N/A')}"
+        )
         lines.append(f"**OS:** {host.get('os', 'N/A')}\n")
 
-        if host.get('vulns'):
+        if host.get("vulns"):
             lines.append(f"### 🚨 Vulnerabilities ({len(host['vulns'])})\n")
-            for vuln in list(host['vulns'])[:10]:  # Limit to 10
+            for vuln in list(host["vulns"])[:10]:  # Limit to 10
                 lines.append(f"- {vuln}")
 
-        if host.get('ports'):
+        if host.get("ports"):
             lines.append(f"\n### 🔓 Open Ports ({len(host['ports'])})\n")
-            lines.append(", ".join(str(p) for p in host['ports']))
+            lines.append(", ".join(str(p) for p in host["ports"]))
 
-        if host.get('data'):
+        if host.get("data"):
             lines.append(f"\n### 📡 Services ({len(host['data'])})\n")
-            for item in host['data'][:5]:  # Limit to 5
-                port = item.get('port', 'N/A')
-                transport = item.get('transport', 'N/A')
-                product = item.get('product', item.get('_shodan', {}).get('module', 'N/A'))
+            for item in host["data"][:5]:  # Limit to 5
+                port = item.get("port", "N/A")
+                transport = item.get("transport", "N/A")
+                product = item.get(
+                    "product", item.get("_shodan", {}).get("module", "N/A")
+                )
                 lines.append(f"\n**Port {port}/{transport}** - {product}")
-                if item.get('version'):
+                if item.get("version"):
                     lines.append(f"Version: {item['version']}")
-                if item.get('data'):
-                    banner = item['data'][:200].replace('\n', ' ')
+                if item.get("data"):
+                    banner = item["data"][:200].replace("\n", " ")
                     lines.append(f"```\n{banner}...\n```")
 
         lines.append(f"\n_Last updated: {host.get('last_update', 'N/A')}_")
@@ -1713,8 +1810,10 @@ async def recon_shodan_host(params: ShodanHostInput) -> str:
 # TOOL 9 — Shodan Search
 # =========================================================================
 
+
 class ShodanSearchInput(BaseModel):
     """Input for Shodan search."""
+
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     query: str = Field(
@@ -1772,34 +1871,37 @@ async def search_shodan(params: ShodanSearchInput) -> str:
         results = api.search(params.query, limit=params.max_results)
 
         if params.response_format == ResponseFormat.JSON:
-            return json.dumps({
-                "query": params.query,
-                "total": results['total'],
-                "matches": results['matches']
-            }, indent=2)
+            return json.dumps(
+                {
+                    "query": params.query,
+                    "total": results["total"],
+                    "matches": results["matches"],
+                },
+                indent=2,
+            )
 
         # Format as markdown
         lines = [f"## Shodan Search: `{params.query}`\n"]
         lines.append(f"**Total results:** {results['total']:,}\n")
         lines.append(f"**Showing:** {len(results['matches'])} results\n")
 
-        for i, match in enumerate(results['matches'], 1):
-            ip = match.get('ip_str', 'N/A')
-            port = match.get('port', 'N/A')
-            org = match.get('org', 'N/A')
+        for i, match in enumerate(results["matches"], 1):
+            ip = match.get("ip_str", "N/A")
+            port = match.get("port", "N/A")
+            org = match.get("org", "N/A")
             location = f"{match.get('location', {}).get('city', 'N/A')}, {match.get('location', {}).get('country_code', 'N/A')}"
 
             lines.append(f"\n### {i}. {ip}:{port}")
             lines.append(f"**Organization:** {org}")
             lines.append(f"**Location:** {location}")
 
-            if match.get('product'):
+            if match.get("product"):
                 lines.append(f"**Product:** {match['product']}")
-            if match.get('version'):
+            if match.get("version"):
                 lines.append(f"**Version:** {match['version']}")
 
-            if match.get('data'):
-                banner = match['data'][:150].replace('\n', ' ')
+            if match.get("data"):
+                banner = match["data"][:150].replace("\n", " ")
                 lines.append(f"```\n{banner}...\n```")
 
         return "\n".join(lines)
@@ -1831,8 +1933,10 @@ async def recon_shodan_search(params: ShodanSearchInput) -> str:
 # TOOL 10 — Shodan DNS Lookup
 # =========================================================================
 
+
 class ShodanDNSInput(BaseModel):
     """Input for Shodan DNS lookup."""
+
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     domain: str = Field(
@@ -1882,10 +1986,9 @@ async def resolve_shodan_dns(params: ShodanDNSInput) -> str:
         results = api.dns.resolve(params.domain)
 
         if params.response_format == ResponseFormat.JSON:
-            return json.dumps({
-                "domain": params.domain,
-                "ips": results if results else []
-            }, indent=2)
+            return json.dumps(
+                {"domain": params.domain, "ips": results if results else []}, indent=2
+            )
 
         # Format as markdown
         lines = [f"## Shodan DNS: {params.domain}\n"]
@@ -1925,8 +2028,10 @@ async def recon_shodan_dns(params: ShodanDNSInput) -> str:
 # TOOL 11 — GitHub Code Search
 # =========================================================================
 
+
 class GitHubSearchInput(BaseModel):
     """Input for GitHub code search."""
+
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     query: str = Field(
@@ -2030,14 +2135,20 @@ async def search_github_secrets(params: GitHubSearchInput) -> str:
 
                 if response.status_code == 200:
                     data = response.json()
-                    for item in data.get("items", [])[:params.max_results]:
-                        all_results.append({
-                            "query": query,
-                            "repository": item.get("repository", {}).get("full_name", "Unknown"),
-                            "file": item.get("path", ""),
-                            "url": item.get("html_url", ""),
-                            "repo_url": item.get("repository", {}).get("html_url", ""),
-                        })
+                    for item in data.get("items", [])[: params.max_results]:
+                        all_results.append(
+                            {
+                                "query": query,
+                                "repository": item.get("repository", {}).get(
+                                    "full_name", "Unknown"
+                                ),
+                                "file": item.get("path", ""),
+                                "url": item.get("html_url", ""),
+                                "repo_url": item.get("repository", {}).get(
+                                    "html_url", ""
+                                ),
+                            }
+                        )
                 elif response.status_code == 403:
                     logger.warning("GitHub API rate limit reached")
                     break
@@ -2048,13 +2159,16 @@ async def search_github_secrets(params: GitHubSearchInput) -> str:
                 await asyncio.sleep(1)
 
         if params.response_format == ResponseFormat.JSON:
-            return json.dumps({
-                "tool": "search_github_secrets",
-                "domain": params.domain,
-                "queries": search_queries,
-                "total_results": len(all_results),
-                "results": all_results
-            }, indent=2)
+            return json.dumps(
+                {
+                    "tool": "search_github_secrets",
+                    "domain": params.domain,
+                    "queries": search_queries,
+                    "total_results": len(all_results),
+                    "results": all_results,
+                },
+                indent=2,
+            )
 
         # Format as markdown
         lines = [f"## GitHub Code Search\n"]
@@ -2074,9 +2188,13 @@ async def search_github_secrets(params: GitHubSearchInput) -> str:
 
                 lines.append(f"{i}. **{result['repository']}** - `{result['file']}`")
                 lines.append(f"   🔗 [{result['url']}]({result['url']})")
-                lines.append(f"   📦 Repository: [{result['repo_url']}]({result['repo_url']})\n")
+                lines.append(
+                    f"   📦 Repository: [{result['repo_url']}]({result['repo_url']})\n"
+                )
 
-        lines.append("\n> ⚠️ **Warning:** Review findings to confirm they are actual exposures and not false positives.")
+        lines.append(
+            "\n> ⚠️ **Warning:** Review findings to confirm they are actual exposures and not false positives."
+        )
 
         return "\n".join(lines)
 
@@ -2107,8 +2225,10 @@ async def recon_github_search(params: GitHubSearchInput) -> str:
 # TOOL 12 — Wayback Machine / Archive.org
 # =========================================================================
 
+
 class WaybackInput(BaseModel):
     """Input for Wayback Machine lookups."""
+
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     url: str = Field(
@@ -2199,7 +2319,9 @@ async def query_wayback(params: WaybackInput) -> str:
             )
 
             if response.status_code != 200:
-                return f"Error: Wayback Machine API returned status {response.status_code}"
+                return (
+                    f"Error: Wayback Machine API returned status {response.status_code}"
+                )
 
             data = response.json()
 
@@ -2218,23 +2340,28 @@ async def query_wayback(params: WaybackInput) -> str:
 
                 archive_url = f"https://web.archive.org/web/{timestamp}/{original}"
 
-                snapshots.append({
-                    "date": f"{year}-{month}-{day}",
-                    "time": time,
-                    "timestamp": timestamp,
-                    "status": statuscode,
-                    "mimetype": mimetype,
-                    "url": original,
-                    "archive_url": archive_url,
-                })
+                snapshots.append(
+                    {
+                        "date": f"{year}-{month}-{day}",
+                        "time": time,
+                        "timestamp": timestamp,
+                        "status": statuscode,
+                        "mimetype": mimetype,
+                        "url": original,
+                        "archive_url": archive_url,
+                    }
+                )
 
             if params.response_format == ResponseFormat.JSON:
-                return json.dumps({
-                    "tool": "query_wayback",
-                    "url": url,
-                    "total_snapshots": len(snapshots),
-                    "snapshots": snapshots
-                }, indent=2)
+                return json.dumps(
+                    {
+                        "tool": "query_wayback",
+                        "url": url,
+                        "total_snapshots": len(snapshots),
+                        "snapshots": snapshots,
+                    },
+                    indent=2,
+                )
 
             # Format as markdown
             lines = [f"## Wayback Machine: {url}\n"]
@@ -2247,11 +2374,15 @@ async def query_wayback(params: WaybackInput) -> str:
 
             for i, snapshot in enumerate(snapshots, 1):
                 lines.append(f"\n### {i}. {snapshot['date']} at {snapshot['time']}")
-                lines.append(f"**Status:** {snapshot['status']} | **Type:** {snapshot['mimetype']}")
+                lines.append(
+                    f"**Status:** {snapshot['status']} | **Type:** {snapshot['mimetype']}"
+                )
                 lines.append(f"**Archive URL:** {snapshot['archive_url']}")
                 lines.append(f"**Original:** {snapshot['url']}")
 
-            lines.append("\n> 💡 **Tip:** Use archive URLs to view historical versions of pages, find deleted content, or discover old endpoints.")
+            lines.append(
+                "\n> 💡 **Tip:** Use archive URLs to view historical versions of pages, find deleted content, or discover old endpoints."
+            )
 
             return "\n".join(lines)
 
@@ -2282,8 +2413,10 @@ async def recon_wayback(params: WaybackInput) -> str:
 # TOOL 13 — TruffleHog Secret Scanner
 # =========================================================================
 
+
 class TruffleHogInput(BaseModel):
     """Input for TruffleHog secret scanning."""
+
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     target: str = Field(
@@ -2433,14 +2566,17 @@ async def hunt_secrets(params: TruffleHogInput) -> str:
                     continue
 
     if params.response_format == ResponseFormat.JSON:
-        return json.dumps({
-            "tool": "hunt_secrets",
-            "target": params.target,
-            "scan_type": params.scan_type,
-            "total_findings": len(findings),
-            "verified": params.verify,
-            "findings": findings
-        }, indent=2)
+        return json.dumps(
+            {
+                "tool": "hunt_secrets",
+                "target": params.target,
+                "scan_type": params.scan_type,
+                "total_findings": len(findings),
+                "verified": params.verify,
+                "findings": findings,
+            },
+            indent=2,
+        )
 
     # Format as markdown
     lines = [f"## TruffleHog Secret Scan\n"]
@@ -2472,7 +2608,9 @@ async def hunt_secrets(params: TruffleHogInput) -> str:
         for detector, detector_findings in sorted(by_detector.items()):
             lines.append(f"\n### {detector} ({len(detector_findings)} found)\n")
 
-            for i, finding in enumerate(detector_findings[:5], 1):  # Limit to 5 per detector
+            for i, finding in enumerate(
+                detector_findings[:5], 1
+            ):  # Limit to 5 per detector
                 verified = finding.get("Verified", False)
                 status = "🔴 VERIFIED" if verified else "⚠️ Unverified"
 
@@ -2481,9 +2619,13 @@ async def hunt_secrets(params: TruffleHogInput) -> str:
                 # Source info
                 source = finding.get("SourceMetadata", {})
                 if scan_type == "github":
-                    repo = source.get("Data", {}).get("Github", {}).get("repository", "")
+                    repo = (
+                        source.get("Data", {}).get("Github", {}).get("repository", "")
+                    )
                     file_path = source.get("Data", {}).get("Github", {}).get("file", "")
-                    commit = source.get("Data", {}).get("Github", {}).get("commit", "")[:8]
+                    commit = (
+                        source.get("Data", {}).get("Github", {}).get("commit", "")[:8]
+                    )
 
                     if repo and file_path:
                         lines.append(f"   **Repo:** {repo}")
@@ -2491,7 +2633,9 @@ async def hunt_secrets(params: TruffleHogInput) -> str:
                         lines.append(f"   **Commit:** {commit}")
                 else:
                     # Filesystem
-                    file_path = source.get("Data", {}).get("Filesystem", {}).get("file", "")
+                    file_path = (
+                        source.get("Data", {}).get("Filesystem", {}).get("file", "")
+                    )
                     if file_path:
                         lines.append(f"   **File:** {file_path}")
 
@@ -2506,7 +2650,9 @@ async def hunt_secrets(params: TruffleHogInput) -> str:
             if len(detector_findings) > 5:
                 lines.append(f"   _...and {len(detector_findings) - 5} more_\n")
 
-        lines.append("\n> 🚨 **CRITICAL:** If verified secrets are found, rotate them immediately!")
+        lines.append(
+            "\n> 🚨 **CRITICAL:** If verified secrets are found, rotate them immediately!"
+        )
 
     if result["stderr"]:
         lines.append(f"\n### Warnings/Errors\n```\n{result['stderr'][:500]}\n```")
@@ -2533,8 +2679,10 @@ async def recon_trufflehog(params: TruffleHogInput) -> str:
 # TOOL 14 — WebScope (web content discovery & analysis)
 # =========================================================================
 
+
 class WebScopeFlow(str, Enum):
     """WebScope discovery flow levels."""
+
     QUICK = "quick"
     IN_DEPTH = "in-depth"
     INTENSE = "intense"
@@ -2542,6 +2690,7 @@ class WebScopeFlow(str, Enum):
 
 class WebScopeInput(BaseModel):
     """Input for WebScope web content analysis."""
+
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     target: str = Field(
@@ -2734,15 +2883,23 @@ async def recon_webscope(params: WebScopeInput) -> str:
             if endpoints:
                 lines.append(f"\n### Endpoints\n")
                 for ep in endpoints[:20]:
-                    lines.append(f"- {ep.get('url', ep) if isinstance(ep, dict) else ep}")
+                    lines.append(
+                        f"- {ep.get('url', ep) if isinstance(ep, dict) else ep}"
+                    )
                 if len(endpoints) > 20:
                     lines.append(f"_... {len(endpoints) - 20} more endpoints_")
 
             if secrets:
                 lines.append(f"\n### 🚨 Secrets Detected\n")
                 for s in secrets[:10]:
-                    stype = s.get("type", "unknown") if isinstance(s, dict) else "unknown"
-                    sval = s.get("value", str(s))[:60] if isinstance(s, dict) else str(s)[:60]
+                    stype = (
+                        s.get("type", "unknown") if isinstance(s, dict) else "unknown"
+                    )
+                    sval = (
+                        s.get("value", str(s))[:60]
+                        if isinstance(s, dict)
+                        else str(s)[:60]
+                    )
                     lines.append(f"- **{stype}**: `{sval}...`")
 
         if not discoveries and not summary:
@@ -2759,8 +2916,10 @@ async def recon_webscope(params: WebScopeInput) -> str:
 # TOOL 15 — SubScope (advanced subdomain enumeration)
 # =========================================================================
 
+
 class SubScopeProfile(str, Enum):
     """SubScope rate limit profiles."""
+
     STEALTH = "stealth"
     NORMAL = "normal"
     AGGRESSIVE = "aggressive"
@@ -2768,6 +2927,7 @@ class SubScopeProfile(str, Enum):
 
 class SubScopeOutputFormat(str, Enum):
     """SubScope output formats."""
+
     JSON = "json"
     CSV = "csv"
     MASSDNS = "massdns"
@@ -2778,6 +2938,7 @@ class SubScopeOutputFormat(str, Enum):
 
 class SubScopeInput(BaseModel):
     """Input for SubScope advanced subdomain enumeration."""
+
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     domain: str = Field(
@@ -2960,6 +3121,7 @@ async def recon_subscope(params: SubScopeInput) -> str:
     input_file = None
     if params.input_domains:
         import tempfile
+
         input_file = tempfile.NamedTemporaryFile(
             mode="w", suffix=".txt", delete=False, prefix="subscope_input_"
         )
@@ -3011,7 +3173,9 @@ async def recon_subscope(params: SubScopeInput) -> str:
                     "tool": "subscope",
                     "domain": params.domain,
                     "statistics": data.get("statistics", {}),
-                    "resolved_domain_names": [d.get("domain", "") for d in resolved[:200]],
+                    "resolved_domain_names": [
+                        d.get("domain", "") for d in resolved[:200]
+                    ],
                     "total_resolved": len(resolved),
                     "total_discovered": len(discovered),
                     "total_failed": len(failed),
@@ -3027,9 +3191,15 @@ async def recon_subscope(params: SubScopeInput) -> str:
             lines = [f"## SubScope — {params.domain}\n"]
             lines.append(f"**Profile:** {params.profile.value}")
             if stats:
-                lines.append(f"**Resolved:** {stats.get('domains_resolved', len(resolved))}")
-                lines.append(f"**Discovered:** {stats.get('domains_discovered', len(discovered))}")
-                lines.append(f"**Execution time:** {stats.get('execution_time', 'N/A')}")
+                lines.append(
+                    f"**Resolved:** {stats.get('domains_resolved', len(resolved))}"
+                )
+                lines.append(
+                    f"**Discovered:** {stats.get('domains_discovered', len(discovered))}"
+                )
+                lines.append(
+                    f"**Execution time:** {stats.get('execution_time', 'N/A')}"
+                )
                 sources = stats.get("sources", [])
                 if sources:
                     lines.append(f"**Sources:** {', '.join(sources)}")
@@ -3050,7 +3220,9 @@ async def recon_subscope(params: SubScopeInput) -> str:
 
             # Show discovered (unresolved) domains
             if discovered:
-                lines.append(f"\n### Discovered (unresolved) — {len(discovered)} total\n")
+                lines.append(
+                    f"\n### Discovered (unresolved) — {len(discovered)} total\n"
+                )
                 for d in discovered[:20]:
                     lines.append(f"- {d.get('domain', d)}")
                 if len(discovered) > 20:
@@ -3066,8 +3238,10 @@ async def recon_subscope(params: SubScopeInput) -> str:
 # TOOL 16 — nmap (network/port scanning)
 # =========================================================================
 
+
 class NmapInput(BaseModel):
     """Input for nmap network scanning."""
+
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     target: str = Field(
@@ -3083,7 +3257,8 @@ class NmapInput(BaseModel):
         default=None,
         description=(
             "Port specification: single (80), range (1-1024), list (22,80,443), "
-            "or special: 'top100', 'top1000'. Default: nmap's default 1000 ports."
+            "or special: 'top100', 'top1000', 'all_interesting_services', "
+            "'http_services'. Default: nmap's default 1000 ports."
         ),
         max_length=500,
     )
@@ -3191,6 +3366,10 @@ async def recon_nmap(params: NmapInput) -> str:
             cmd.append("-F")  # Fast scan = top 100
         elif p == "top1000":
             pass  # nmap default
+        elif p == "all_interesting_services":
+            cmd.extend(["-p", ALL_INTERESTING_SERVICES_PORTS])
+        elif p == "http_services":
+            cmd.extend(["-p", HTTP_SERVICES_PORTS])
         else:
             cmd.extend(["-p", params.ports])
 
@@ -3203,6 +3382,7 @@ async def recon_nmap(params: NmapInput) -> str:
     # Extra args (split by spaces, respecting simple quoting)
     if params.extra_args:
         import shlex
+
         try:
             cmd.extend(shlex.split(params.extra_args))
         except ValueError:
@@ -3236,7 +3416,9 @@ async def recon_nmap(params: NmapInput) -> str:
         lines.append(f"```\n{truncated}\n```")
 
         if result["stderr"].strip():
-            stderr_trunc = _truncate_output(result["stderr"], max_lines=20, max_chars=1500)
+            stderr_trunc = _truncate_output(
+                result["stderr"], max_lines=20, max_chars=1500
+            )
             lines.append(f"\n### Stderr\n```\n{stderr_trunc}\n```")
 
         return "\n".join(lines)
@@ -3245,11 +3427,203 @@ async def recon_nmap(params: NmapInput) -> str:
 
 
 # =========================================================================
+# TOOL 17 — ipintel (IP/domain intelligence)
+# =========================================================================
+
+
+class IPIntelInput(BaseModel):
+    """Input for ipintel IP/domain intelligence lookup."""
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    target: str = Field(
+        ...,
+        description="IP address or domain to analyze (e.g., '8.8.8.8' or 'example.com')",
+        min_length=1,
+        max_length=253,
+    )
+    no_cache: bool = Field(
+        default=False,
+        description="Disable ipintel local cache for fresh lookups",
+    )
+    no_aws: bool = Field(
+        default=False,
+        description="Skip AWS tenant ownership lookup",
+    )
+    no_azure: bool = Field(
+        default=False,
+        description="Skip Azure tenant ownership lookup",
+    )
+    no_gcp: bool = Field(
+        default=False,
+        description="Skip GCP tenant ownership lookup",
+    )
+    timeout: int = Field(
+        default=DEFAULT_TIMEOUT,
+        description="Overall execution timeout in seconds",
+        ge=30,
+        le=1800,
+    )
+    response_format: ResponseFormat = Field(
+        default=ResponseFormat.MARKDOWN,
+        description="Output format: 'markdown' or 'json'",
+    )
+
+    @field_validator("target")
+    @classmethod
+    def validate_target(cls, v: str) -> str:
+        v = v.strip()
+        if v.startswith(("http://", "https://")):
+            v = v.split("//", 1)[1]
+        return v.split("/")[0]
+
+
+@mcp.tool(
+    name="lookup_ip_dns",
+    annotations={
+        "title": "IPIntel — IP & DNS Intelligence Lookup",
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def lookup_ip_dns(params: IPIntelInput) -> str:
+    """Collect comprehensive IP/domain intelligence using ipintel.
+
+    Runs multi-provider OSINT and DNS lookups for an IP or domain, including
+    ASN/RDAP context, DNS intelligence, reverse DNS, cloud ownership clues,
+    and threat intelligence enrichment (when API keys are configured).
+
+    Note: ipintel may perform active checks (for example, service probing).
+    Use only on authorized targets.
+
+    Args:
+        params (IPIntelInput): Target and lookup configuration.
+
+    Returns:
+        str: Intelligence report in Markdown or JSON.
+    """
+    _check_binary("ipintel")
+
+    cmd = ["ipintel", "-json", "-no-spinner"]
+
+    if params.no_cache:
+        cmd.append("-no-cache")
+    if params.no_aws:
+        cmd.append("-no-aws")
+    if params.no_azure:
+        cmd.append("-no-azure")
+    if params.no_gcp:
+        cmd.append("-no-gcp")
+
+    cmd.append(params.target)
+
+    result = await _run_command(cmd, timeout=params.timeout)
+
+    parsed: Optional[Any] = None
+    if result["stdout"].strip():
+        try:
+            parsed = json.loads(result["stdout"])
+        except (json.JSONDecodeError, ValueError):
+            parsed = None
+
+    if params.response_format == ResponseFormat.JSON:
+        if parsed is not None:
+            raw = json.dumps(
+                {
+                    "tool": "lookup_ip_dns",
+                    "target": params.target,
+                    "result": parsed,
+                },
+                indent=2,
+            )
+            if len(raw) > MAX_OUTPUT_CHARS:
+                if isinstance(parsed, dict):
+                    compact = {
+                        "tool": "lookup_ip_dns",
+                        "target": params.target,
+                        "truncated": True,
+                        "top_level_fields": list(parsed.keys()),
+                        "ip": parsed.get("ip")
+                        or parsed.get("resolved_ip")
+                        or parsed.get("target_ip"),
+                        "domain": parsed.get("domain") or parsed.get("target"),
+                        "open_ports": parsed.get("open_ports") or parsed.get("ports"),
+                    }
+                else:
+                    compact = {
+                        "tool": "lookup_ip_dns",
+                        "target": params.target,
+                        "truncated": True,
+                        "result_type": type(parsed).__name__,
+                    }
+                return json.dumps(compact, indent=2)
+            return raw
+        return _format_result(result, "ipintel", params.response_format)
+
+    if parsed is None:
+        return _format_result(result, "ipintel", params.response_format)
+
+    lines = [f"## IP/DNS Intelligence — {params.target}\n"]
+
+    if isinstance(parsed, dict):
+        keys = list(parsed.keys())
+        if keys:
+            lines.append(f"**Top-level fields:** {', '.join(keys[:12])}")
+
+        ip_val = (
+            parsed.get("ip") or parsed.get("resolved_ip") or parsed.get("target_ip")
+        )
+        domain_val = parsed.get("domain") or parsed.get("target")
+        if ip_val:
+            lines.append(f"**Resolved IP:** {ip_val}")
+        if domain_val and str(domain_val) != params.target:
+            lines.append(f"**Domain:** {domain_val}")
+
+        ports = parsed.get("open_ports") or parsed.get("ports")
+        if isinstance(ports, list) and ports:
+            sample_ports = ", ".join(str(p) for p in ports[:20])
+            lines.append(f"**Open ports (sample):** {sample_ports}")
+
+        raw_json = json.dumps(parsed, indent=2)
+        lines.append("\n### Raw Intelligence (truncated)\n")
+        lines.append(f"```json\n{_truncate_output(raw_json)}\n```")
+    else:
+        raw_json = json.dumps(parsed, indent=2)
+        lines.append(f"```json\n{_truncate_output(raw_json)}\n```")
+
+    if result["stderr"].strip():
+        lines.append(
+            f"\n### Stderr\n```\n{_truncate_output(result['stderr'], max_lines=30, max_chars=2000)}\n```"
+        )
+
+    return "\n".join(lines)
+
+
+@mcp.tool(
+    name="recon_ipintel",
+    annotations={
+        "title": "DEPRECATED: Use lookup_ip_dns",
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def recon_ipintel(params: IPIntelInput) -> str:
+    """Deprecated alias for lookup_ip_dns."""
+    return await lookup_ip_dns(params)
+
+
+# =========================================================================
 # UTILITY TOOL — List available tools and check binary status
 # =========================================================================
 
+
 class StatusInput(BaseModel):
     """Input for the status check tool."""
+
     model_config = ConfigDict(extra="forbid")
 
     response_format: ResponseFormat = Field(
@@ -3291,6 +3665,7 @@ async def check_tool_status(params: StatusInput) -> str:
         "webscope": "Web content discovery & analysis",
         "subscope": "Advanced subdomain enumeration",
         "nmap": "Network & port scanner",
+        "ipintel": "IP/domain OSINT and DNS intelligence",
     }
 
     statuses = {}
@@ -3328,11 +3703,14 @@ async def check_tool_status(params: StatusInput) -> str:
     }
 
     if params.response_format == ResponseFormat.JSON:
-        return json.dumps({
-            "tools": statuses,
-            "python_integrations": python_integrations,
-            "api_keys": env_vars
-        }, indent=2)
+        return json.dumps(
+            {
+                "tools": statuses,
+                "python_integrations": python_integrations,
+                "api_keys": env_vars,
+            },
+            indent=2,
+        )
 
     lines = ["## FieldKit MCP — Environment Status\n", "### Tool Binaries\n"]
     for name, info in statuses.items():
@@ -3379,8 +3757,15 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="FieldKit MCP Server")
-    parser.add_argument("--port", type=int, default=SERVER_PORT, help="HTTP listen port (ignored if MCP_TRANSPORT=stdio)")
-    parser.add_argument("--stdio", action="store_true", help="Use stdio transport (for Claude Desktop)")
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=SERVER_PORT,
+        help="HTTP listen port (ignored if MCP_TRANSPORT=stdio)",
+    )
+    parser.add_argument(
+        "--stdio", action="store_true", help="Use stdio transport (for Claude Desktop)"
+    )
     args = parser.parse_args()
 
     # Determine transport mode

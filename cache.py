@@ -12,7 +12,10 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 
-DEFAULT_CACHE_DB = os.environ.get("CACHE_DB", "cache/cache.db")
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_CACHE_DB = os.environ.get(
+    "CACHE_DB", os.path.join(_SCRIPT_DIR, "cache", "cache.db")
+)
 
 
 SCHEMA_SQL = """

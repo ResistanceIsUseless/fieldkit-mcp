@@ -19,16 +19,21 @@ require_cmd() {
 
 echo "[*] FieldKit-MCP installer"
 require_cmd python3
-require_cmd pip
+require_cmd pipx
 require_cmd go
 require_cmd git
+require_cmd brew
 
-echo "[*] Installing Python dependencies"
-pip install -r "${ROOT_DIR}/requirements.txt"
-pip install theHarvester
+PIPX_HOME_DIR="${PIPX_HOME:-$HOME/.local/pipx}"
+MCP_VENV_PYTHON="${PIPX_HOME_DIR}/venvs/mcp/bin/python"
+
+echo "[*] Installing Python dependencies with pipx"
+pipx install --force --python python3 "mcp[cli]"
+pipx runpip mcp install -r "${ROOT_DIR}/requirements.txt"
+pipx runpip mcp install theHarvester
 
 echo "[*] Installing Playwright Chromium"
-python3 -m playwright install chromium
+"${MCP_VENV_PYTHON}" -m playwright install chromium
 
 echo "[*] Installing Go recon tools"
 go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
@@ -36,9 +41,12 @@ go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
 go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest
 go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
 go install -v github.com/projectdiscovery/katana/cmd/katana@latest
-go install -v github.com/trufflesecurity/trufflehog/v3@latest
-go install -v github.com/ResistanceIsUseless/webscope@latest
-go install -v github.com/ResistanceIsUseless/subscope@latest
+go install -v github.com/ResistanceIsUseless/ipintel/cmd/ipintel@latest
+go install -v github.com/resistanceisuseless/webscope@latest
+go install -v github.com/resistanceisuseless/subscope/cmd/subscope@latest
+
+echo "[*] Installing trufflehog via Homebrew"
+brew install trufflehog
 
 mkdir -p "${WORDLIST_BASE}"
 if [ ! -d "${SECLISTS_DIR}" ]; then
@@ -57,4 +65,4 @@ echo "    - Go tools installed to your GOPATH/bin"
 echo "    - Playwright Chromium installed"
 echo "    - SecLists available at ${SECLISTS_DIR}"
 echo
-echo "Run server: FIELDKIT_MCP_PORT=8000 python3 ${ROOT_DIR}/fieldkit_mcp_server.py"
+echo "Run server: FIELDKIT_MCP_PORT=8000 ${MCP_VENV_PYTHON} ${ROOT_DIR}/fieldkit_mcp_server.py"

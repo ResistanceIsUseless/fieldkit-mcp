@@ -30,10 +30,18 @@ A comprehensive MCP server exposing multi-engine search dorking, Shodan, GitHub 
 | `query_cache` | sqlite | Local | List and retrieve cached web responses |
 | `recon_webscope` | `webscope` | **Active** | Web content discovery, JS analysis, secret detection, path bruteforcing |
 | `recon_nmap` | `nmap` | **Active** | Network & port scanning with service/OS/vuln detection |
+| `lookup_ip_dns` | `ipintel` | Passive/Active | Comprehensive IP/domain OSINT with DNS, ASN, RDAP, cloud, and threat intel |
 | `harvest_osint` | `theHarvester` | Passive | Email, subdomain & IP OSINT |
 | `check_tool_status` | — | Local | Checks which binaries, integrations, and API keys are available |
 
 Legacy `recon_*` names are still available as deprecated aliases for compatibility.
+
+### Port Presets
+
+`probe_http` and `recon_nmap` support these reusable port preset names via their `ports` parameter:
+
+- `all_interesting_services` (broad service coverage)
+- `http_services` (HTTP-centric service ports)
 
 ## Prerequisites
 
@@ -52,6 +60,7 @@ go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
 go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest
 go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
 go install -v github.com/projectdiscovery/katana/cmd/katana@latest
+go install -v github.com/ResistanceIsUseless/ipintel/cmd/ipintel@latest
 ```
 
 **TruffleHog** (Go-based secret scanner):
@@ -62,7 +71,7 @@ go install github.com/trufflesecurity/trufflehog/v3@latest
 **Custom recon tools** (Go-based):
 ```bash
 go install github.com/ResistanceIsUseless/webscope@latest
-go install github.com/ResistanceIsUseless/subscope@latest
+go install github.com/ResistanceIsUseless/subscope/cmd/subscope@latest
 ```
 
 **Nmap** (system package):

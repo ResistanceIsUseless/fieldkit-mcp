@@ -10,6 +10,7 @@ RUN go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
 RUN go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest
 RUN go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
 RUN go install -v github.com/projectdiscovery/katana/cmd/katana@latest
+RUN go install -v github.com/ResistanceIsUseless/ipintel/cmd/ipintel@latest
 
 # TruffleHog — secret scanner
 RUN go install github.com/trufflesecurity/trufflehog/v3@latest
@@ -38,6 +39,7 @@ COPY --from=go-builder /go/bin/nuclei /usr/local/bin/
 COPY --from=go-builder /go/bin/dnsx /usr/local/bin/
 COPY --from=go-builder /go/bin/httpx /usr/local/bin/
 COPY --from=go-builder /go/bin/katana /usr/local/bin/
+COPY --from=go-builder /go/bin/ipintel /usr/local/bin/
 COPY --from=go-builder /go/bin/trufflehog /usr/local/bin/
 COPY --from=go-builder /go/bin/webscope /usr/local/bin/
 COPY --from=go-builder /go/bin/subscope /usr/local/bin/
